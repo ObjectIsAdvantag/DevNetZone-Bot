@@ -15,19 +15,21 @@ var config = {
     // Required for the bot to send messages
     token: process.env.SPARK_TOKEN,
 
-    attach_as: "integration",
-    port: process.env.PORT || 8080,
-    URI: process.env.SPARK_URI || "/spark",
+    integrationURI: process.env.INTEGRATION_URI || "/spark",
+
+    webhookURI: process.env.WEBHOOK_URI || "/",
 
     // This id is used to filter all messages orginating from your bot
     // Note: you MUST replace this id by the account associated to the SPARK_TOKEN, otherwise you would encounter a never ending loop, as your bot will listen / write / listen / write...
-    peopleId: process.env.SPARK_BOTPERSONID || "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8wNzMyNWQyZi01MWRlLTQxYWItYjNhNC02YTMwZDBiZTVmZWQ",
+    peopleId: process.env.BOT_PERSONID || "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8wNzMyNWQyZi01MWRlLTQxYWItYjNhNC02YTMwZDBiZTVmZWQ",
 
     // This id is used to filter all messages orginating from your bot
     // Note: you MUST replace this id by the account associated to the SPARK_TOKEN, otherwise you would encounter a never ending loop, as your bot will listen / write / listen / write...
-    commandNextSessions: process.env.SPARK_NEXTCOMMAND || "/next",
+    commandNextSessions: process.env.NEXT_COMMAND || "/next",
 
-    maxSessions: process.env.SPARK_MAXDISPLAYED || 10
+    activitiesAPI: process.env.ACTIVITIES_API || "https://devnetzone.cleverapps.io/api/v1",
+
+    maxSessions: process.env.MAX_DISPLAYED || 10
 
 };
 
@@ -80,7 +82,7 @@ function fetchNextSessions(max, sparkCallback) {
     // Get list of upcoming sessions
     var options = {
         method: 'GET',
-        url: 'https://devnetzone.cleverapps.io/api/v1/activities/next'
+        url: config.activitiesAPI + "/activities/next"
     };
 
     request(options, function (error, response, body) {

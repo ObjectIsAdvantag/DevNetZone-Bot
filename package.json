@@ -1,6 +1,6 @@
 {
   "name": "DevNetZone-SparkBot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Spark bot for the DevNetZone Cisco Live Vegas 2016 edition",
   "main": "server.js",
   "scripts": {
@@ -17,6 +17,6 @@
   "dependencies": {
     "node-sparky": "^2.0.27",
     "request": "^2.72.0",
-    "sparkbot-starterkit": "^0.5.0"
+    "sparkbot-starterkit": "^0.7.0"
   }
 }

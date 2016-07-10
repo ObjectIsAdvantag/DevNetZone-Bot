@@ -1,36 +1,33 @@
 /*
- * Cisco Spark Bot to list Activities
+ * Cisco Spark Bot to display current and next Activities,
+ * and play a simple Quiz. 
  *
- * Leverages the REST Webhook sample + a Spark Token to write back to the room
- *
- * INSTALLATION NOTES : the node-sparky is required, to install it run :
- *   > npm install node-sparky --save
- *   > 
  */
 var SparkBot = require("sparkbot-starterkit");
 var Sparky = require("node-sparky");
 var request = require("request");
 
 var config = {
-    // Required for the bot to send messages
+    // Required for the bot to push messages to Spark
     token: process.env.SPARK_TOKEN,
 
-    integrationURI: process.env.INTEGRATION_URI || "/spark",
+    integrationURI: process.env.INTEGRATION_URI || "/integration",
 
-    webhookURI: process.env.WEBHOOK_URI || "/",
+    webhookURI: process.env.WEBHOOK_URI || "/webhook",
 
-    // This id is used to filter all messages orginating from your bot
+    // This id is used to filxter all messages orginating from your bot
     // Note: you MUST replace this id by the account associated to the SPARK_TOKEN, otherwise you would encounter a never ending loop, as your bot will listen / write / listen / write...
-    peopleId: process.env.BOT_PERSONID || "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8wNzMyNWQyZi01MWRlLTQxYWItYjNhNC02YTMwZDBiZTVmZWQ",
-
-    // This id is used to filter all messages orginating from your bot
-    // Note: you MUST replace this id by the account associated to the SPARK_TOKEN, otherwise you would encounter a never ending loop, as your bot will listen / write / listen / write...
-    commandNextSessions: process.env.NEXT_COMMAND || "/next",
+    peopleId: process.env.BOT_PERSONID || "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9hODYwYmFkZC0wNGZkLTQwYWEtYWFjNS05NmYyYWRhZDE3NTA",
 
     activitiesAPI: process.env.ACTIVITIES_API || "https://devnetzone.cleverapps.io/api/v1",
+    maxActivities: process.env.ACTIVITIES_MAX || 5,
+    commandNextActivities: process.env.COMMAND_NEXT || "next",
+    commandCurrentActivities: process.env.COMMAND_CURRENT || "current",
 
-    maxSessions: process.env.MAX_DISPLAYED || 10
-
+    commandChallenge: process.env.COMMAND_CHALLENGE || "challenge",
+    commandAnswer: process.env.COMMAND_ANSWER || "guess",
+    commandHelp: process.env.COMMAND_HELP || "help",
+    commandEuro: process.env.COMMAND_EURO || "euro"
 };
 
 // Starts your bot
@@ -50,39 +47,75 @@ bot.register(function (message) {
     }
 
     // If it is not a command, ignore it
-    var isCommand = message.text.toLowerCase().startsWith("/");
-    if (!isCommand) {
+    if ('/' != message.text.charAt(0)) {
         console.log("not a command => ignoring");
         return;
     }
 
-    // Now let's do the actual work or display help
-    var isNextSessions = message.text.toLowerCase().startsWith(config.commandNextSessions);
-    if (isNextSessions) {
-        fetchNextSessions(config.maxSessions, function (err, msg) {
-            if (!err) sendText(message.roomId, msg);
-        });
-        return;
+    var splitted = message.text.substring(1).toLowerCase().split(' ');
+    
+    var command = splitted[0];
+    if (!command)
+    console.log("identified command: " + command);
+    switch (command) {
+        
+        case config.commandNextActivities:
+            var limit = splitted[1];
+            if (!limit) limit = config.maxActivities;
+            if (limit < 1) limit = 1;
+            console.log("fetching next activities, max: " + limit);
+            fetchNextActivities(limit, function (err, msg) {
+                 if (!err) sendText(message.roomId, msg);
+             });
+            break;
+
+        case config.commandCurrentActivities:
+            var limit = splitted[1];
+            if (!limit) limit = config.maxActivities;
+            if (limit < 1) limit = 1;
+            console.log("fetching current activities, max: " + limit);
+            fetchCurrentActivities(limit, function (err, msg) {
+                    if (!err) sendText(message.roomId, msg);
+             });
+            break;
+
+        case config.commandHelp:
+            displayHelp(message.roomId);
+            break;
+
+        default:
+            displayDidNotRecognize(command, message.roomId);
+            break;    
     }
 
-    displayAide(message.roomId);
 });
 
-function displayAide(roomId) {
-    sendText(roomId, "" + config.commandNextSessions + " to display upcoming activities happening in the DevNet Zone");
+function displayHelp(roomId) {
+    sendText(roomId, "Welcome to the @CiscoDevNet Zone at #CLUS\n"
+        + "   /" + config.commandNextActivities + " to check upcoming activities\n"
+        + "   /" + config.commandCurrentActivities + " for current activities\n"
+        );
 }
 
-function showSessions(roomId) {
-    var msg = fetchNextSessions(config.maxSessions);
+function displayDidNotRecognize(command, roomId) {
+    sendText(roomId, "Sorry, command /" + command + " is not supported\n"
+        + "   /" + config.commandNextActivities + " to check upcoming activities\n"
+        + "   /" + config.commandCurrentActivities + " for current activities\n"
+        );
+}
+
+
+function showActivities(roomId) {
+    var msg = fetchNextActivities(config.maxActivities);
     sendText(roomId, msg);
 }
 
-function fetchNextSessions(max, sparkCallback) {
+function fetchNextActivities(limit, sparkCallback) {
 
-    // Get list of upcoming sessions
+    // Get list of upcoming activities
     var options = {
         method: 'GET',
-        url: config.activitiesAPI + "/activities/next"
+        url: config.activitiesAPI + "/activities/next?limit=" + limit
     };
 
     request(options, function (error, response, body) {
@@ -94,32 +127,70 @@ function fetchNextSessions(max, sparkCallback) {
 
         if ((response < 200) || (response > 299)) {
             console.log("could not retreive list of activities, response: " + response);
-            sparkCallback(new Error("Could not retreive upcoming sessions, sorry [Activities API not responding]"), null);
+            sparkCallback(new Error("Could not retreive upcoming activities, sorry [Activities API not responding]"), null);
             return;
         }
 
-        var sessions = JSON.parse(body);
-        console.log("retreived " + sessions.length + " activities: " + JSON.stringify(sessions));
+        var activities = JSON.parse(body);
+        console.log("retreived " + activities.length + " activities: " + JSON.stringify(activities));
 
-        if (sessions.length == 0) {
+        if (activities.length == 0) {
             // [TODO] Check date is after latest activity
-
-            sparkCallback(null, "ZERO upcoming activity, event should be over by now. Hope you had a great Cisco Live at the DevNet Zone and see you next year !");
+            sparkCallback(null, "No upcoming activity, event may over ?! Hope you had a great Cisco Live at the DevNet Zone and see you next year !");
             return;
         }
 
-        var msg = "" + sessions.length + " upcoming activities:";
-         var nbSessions = sessions.length;
-         if (nbSessions > max) nbSessions=max;
-         for (var i = 0; i < nbSessions; i++) {
-             var current = sessions[i];
-             msg += "\n- " + current.day + " " + current.begin + ": " + current.title + " at " + current.location + " by " + current.speaker;
-        }
-        
-        sparkCallback (null,msg);
+        var nbActivities = activities.length;
+        var msg = "Here are the " + nbActivities + " upcoming activities";
+        for (var i = 0; i < nbActivities; i++) {
+            var current = activities[i];
+            msg += "\n- " + current.beginDay + " " + current.beginTime + ": " + current.title + "\n   at " + current.location + " by " + current.speaker;
+    }
+    
+    sparkCallback (null, msg);
     });
 }
 
+function fetchCurrentActivities(limit, sparkCallback) {
+
+    // Get list of upcoming activities
+    var options = {
+        method: 'GET',
+        url: config.activitiesAPI + "/activities/current?limit=" + limit
+    };
+
+    request(options, function (error, response, body) {
+        if (error) {
+            console.log("could not retreive list of activities, error: " + error);
+            sparkCallback(new Error("Could not retreive current activities, sorry [Activities API not responding]"), null);
+            return;
+        }
+
+        if ((response < 200) || (response > 299)) {
+            console.log("could not retreive list of activities, response: " + response);
+            sparkCallback(new Error("Could not retreive current activities, sorry [Activities API not responding]"), null);
+            return;
+        }
+
+        var activities = JSON.parse(body);
+        console.log("retreived " + activities.length + " activities: " + JSON.stringify(activities));
+
+        if (activities.length == 0) {
+            // [TODO] Check date is after latest activity
+            sparkCallback(null, "No activity in the DevNet Zone currently. Type /next to check upcoming activities.");
+            return;
+        }
+
+        var nbActivities = activities.length;
+        var msg = "Here are the " + nbActivities + " current activities";
+        for (var i = 0; i < nbActivities; i++) {
+            var current = activities[i];
+            msg += "\n- " + current.beginDay + " " + current.beginTime + ": " + current.title + "\n   at " + current.location + " by " + current.speaker;
+    }
+    
+    sparkCallback (null, msg);
+    });
+}
 
 
 //
